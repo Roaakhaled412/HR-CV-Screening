@@ -1,0 +1,1956 @@
+{
+  "name": "HR_cv_screening",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Job Application",
+        "formDescription": "Fill in your details, choose the position, and upload your CV (PDF).",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Name",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Email",
+              "fieldType": "email",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Position",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Senior Backend Developer"
+                  },
+                  {
+                    "option": "Frontend Developer"
+                  },
+                  {
+                    "option": "Data Analyst"
+                  },
+                  {
+                    "option": "HR Specialist"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "CV",
+              "fieldType": "file",
+              "multipleFiles": false,
+              "acceptFileTypes": ".pdf",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {
+          "respondWithOptions": {
+            "values": {
+              "formSubmittedText": "Application received ✅ Thank you for applying! We will review your CV and get back to you by email."
+            }
+          }
+        }
+      },
+      "id": "4830f182-edf3-4a87-bd16-9426b44fd82e",
+      "name": "Application Form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        -1536,
+        880
+      ],
+      "webhookId": "deebbb77-25f5-44d8-87fd-b617fc025ea9"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1XD25tfiQtIm8Y3NqG6hQcFT5kBrjS3L_Jc3sr1qxUug",
+          "mode": "list",
+          "cachedResultName": "jobs-sheet-template",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1XD25tfiQtIm8Y3NqG6hQcFT5kBrjS3L_Jc3sr1qxUug/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 2125618145,
+          "mode": "list",
+          "cachedResultName": "jobs-sheet-template",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1XD25tfiQtIm8Y3NqG6hQcFT5kBrjS3L_Jc3sr1qxUug/edit#gid=2125618145"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "job_title",
+              "lookupValue": "={{ $('Application Form').first().json.Position }}"
+            }
+          ]
+        },
+        "options": {
+          "returnFirstMatch": true
+        }
+      },
+      "id": "73023700-ade8-4dd7-abfd-1aee57e51803",
+      "name": "Get Jobs",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        -992,
+        880
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "6wTc27nuIfOqCIRh",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "binaryPropertyName": "CV",
+        "options": {}
+      },
+      "id": "75d0550e-47c6-4f2a-97a7-71a5c50ebbb0",
+      "name": "Extract CV Text",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        -1376,
+        880
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are an HR screening assistant.\n\nJob Requirements:\n- Position: {{ $json.job_title }}\n- Required skills: {{ $json.required_skills }}\n- Minimum experience: {{ $json.min_experience }} years\n- Education: {{ $json.education_required }}\n\nCV text:\n{{ $('Extract CV Text').first().json.text }}\n\nExtract the candidate's details from the CV and score the match against the job requirements.\nScoring: skills match 50%, experience 30%, education 20%. Be strict and honest.",
+        "hasOutputParser": true
+      },
+      "id": "52373317-940d-482e-bcea-510c18327191",
+      "name": "AI Analysis",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.5,
+      "position": [
+        -800,
+        880
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-oss-120b",
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "id": "dde9fc7b-86c3-4f3e-ae3b-e96f78c75ac4",
+      "name": "Groq Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        -784,
+        1104
+      ],
+      "credentials": {
+        "groqApi": {
+          "id": "JxFETANY7t2o6vTI",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $('AI Analysis').first().json.output.score }}",
+              "rightValue": "={{ (Number($('Get Jobs').first().json.pass_score) || 70) }}",
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a47016f4-80e6-4d28-bdc0-b5929d898733",
+      "name": "Score >= Job Pass Score?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -240,
+        880
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Application Form').first().json.Email }}",
+        "subject": "Update on your application",
+        "emailType": "text",
+        "message": "=Dear {{ $('Application Form').first().json.Name }},\n\nThank you for your interest in the {{ $('Get Jobs').first().json.job_title }} position and for taking the time to apply.\n\nAfter careful review, we've decided to move forward with other candidates whose experience more closely matches our current needs.\n\nWe will keep your details on file and wish you all the best in your job search.\n\nBest regards,\nHR Team",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "1a041b69-dac9-47c6-a871-3ee9aa4ac086",
+      "name": "Send Rejection Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1104,
+        1296
+      ],
+      "webhookId": "952fa966-9d15-40c4-81ff-d08a47862fb4",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "cDz9RhFVhep9TXg8",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "sendTo": "={{ $('Get Jobs').first().json.hr_email }}",
+        "subject": "=Candidate Review ({{ $('Get Jobs').first().json.job_title }}): {{ $('Application Form').first().json.Name }} - Score {{ $('AI Analysis').first().json.output.score }}",
+        "message": "=Candidate: {{ $('Application Form').first().json.Name }}\nEmail: {{ $('Application Form').first().json.Email }}\nPosition: {{ $('Get Jobs').first().json.job_title }}\nScore: {{ $('AI Analysis').first().json.output.score }}/100 (pass score: {{ (Number($('Get Jobs').first().json.pass_score) || 70) }})\nReason: {{ $('AI Analysis').first().json.output.reason }}\n\nExperience: {{ $('AI Analysis').first().json.output.years_of_experience }} years\nEducation: {{ $('AI Analysis').first().json.output.education }}\nSkills: {{ $('AI Analysis').first().json.output.skills.join(', ') }}\nMatched: {{ $('AI Analysis').first().json.output.matched_skills.join(', ') }}\nMissing: {{ $('AI Analysis').first().json.output.missing_skills.join(', ') }}\n\nSummary:\n{{ $('AI Analysis').first().json.output.summary }}\n\n(If there is no decision within 2 days, a reminder will be escalated automatically.)",
+        "approvalOptions": {
+          "values": {
+            "approvalType": "double",
+            "approveLabel": "✅ Approve - Schedule Interview",
+            "disapproveLabel": "❌ Reject"
+          }
+        },
+        "options": {
+          "limitWaitTime": {
+            "values": {
+              "resumeAmount": 2,
+              "resumeUnit": "minutes"
+            }
+          }
+        }
+      },
+      "id": "c07b5e1c-99d2-42f8-b20d-b30c28bb437f",
+      "name": "Ask HR for Decision",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        208,
+        768
+      ],
+      "webhookId": "hr-decision-webhook",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "cDz9RhFVhep9TXg8",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pick the FIRST FREE 1-hour slot in HR's Google Calendar.\n// Input = output of \"Check HR Calendar\" (raw freeBusy response, or a list of {start,end}).\n// Rules: start tomorrow, skip Fri/Sat (Egypt weekend), slots start 11:00-15:00, look 14 days ahead.\nconst busy = [];\nfor (const item of $input.all()) {\n  const j = item.json;\n  if (j.calendars) {\n    for (const cal of Object.values(j.calendars)) {\n      if (cal.errors && cal.errors.length) {\n        throw new Error('Cannot read HR calendar: ' + JSON.stringify(cal.errors));\n      }\n      (cal.busy || []).forEach(b => busy.push(b));\n    }\n  } else if (j.start && j.end) {\n    busy.push({ start: j.start, end: j.end });\n  }\n}\nconst ranges = busy.map(b => ({ s: DateTime.fromISO(b.start), e: DateTime.fromISO(b.end) }));\n\nconst startHours = [11, 12, 13, 14, 15];\nlet day = $now.plus({ days: 1 }).startOf('day');\n\nfor (let i = 0; i < 14; i++, day = day.plus({ days: 1 })) {\n  if ([5, 6].includes(day.weekday)) continue; // Fri, Sat\n  for (const h of startHours) {\n    const s = day.set({ hour: h, minute: 0, second: 0, millisecond: 0 });\n    const e = s.plus({ hours: 1 });\n    const clash = ranges.some(r => s < r.e && e > r.s);\n    if (!clash) {\n      return [{\n        json: {\n          start: s.toISO(),\n          end: e.toISO(),\n          pretty: s.toFormat(\"cccc, dd LLL yyyy 'at' hh:mm a\") + ' (Cairo time)'\n        }\n      }];\n    }\n  }\n}\nthrow new Error('No free interview slot in the next 14 days in HR calendar');"
+      },
+      "id": "b333a0cb-3ce2-439b-8149-c664588f84ba",
+      "name": "Pick Interview Slot",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1328,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "calendar": {
+          "__rl": true,
+          "value": "={{ $('Get Jobs').first().json.hr_email }}",
+          "mode": "id"
+        },
+        "start": "={{ $json.start }}",
+        "end": "={{ $json.end }}",
+        "additionalFields": {
+          "attendees": [
+            "={{ $('Application Form').first().json.Email }}",
+            "={{ $('Get Jobs').first().json.hr_email }}"
+          ],
+          "conferenceDataUi": {
+            "conferenceDataValues": {
+              "conferenceSolution": "hangoutsMeet"
+            }
+          },
+          "sendUpdates": "all",
+          "summary": "=Interview - {{ $('Application Form').first().json.Name }} ({{ $('Get Jobs').first().json.job_title }})"
+        }
+      },
+      "id": "0f671b5e-85c0-4d1a-92b1-1950d90538ec",
+      "name": "Create Interview Event",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        1552,
+        640
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "gUAIbNYVOsPCotAA",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Application Form').first().json.Email }}",
+        "subject": "Interview Invitation - Congratulations!",
+        "emailType": "text",
+        "message": "=Dear {{ $('Application Form').first().json.Name }},\n\nCongratulations! We were impressed by your profile and would like to invite you for an interview for the {{ $('Get Jobs').first().json.job_title }} position.\n\nDate & Time: {{ $('Pick Interview Slot').first().json.pretty }}\nMeeting link: {{ $('Create Interview Event').first().json.hangoutLink || 'Included in the calendar invitation' }}\n\nA calendar invitation has also been sent to you.\n\nBest regards,\nHR Team",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "31bd1b64-e71f-4266-b5f7-19a96463aed8",
+      "name": "Send Acceptance Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1776,
+        640
+      ],
+      "webhookId": "cc16e5ac-3108-49f3-9fd5-0994e52dd3b2",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "cDz9RhFVhep9TXg8",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1XD25tfiQtIm8Y3NqG6hQcFT5kBrjS3L_Jc3sr1qxUug",
+          "mode": "list",
+          "cachedResultName": "jobs-sheet-template",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1XD25tfiQtIm8Y3NqG6hQcFT5kBrjS3L_Jc3sr1qxUug/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Candidates",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "application_id": "={{ $execution.id }}",
+            "date": "={{ $now.toFormat('yyyy-MM-dd HH:mm') }}",
+            "name": "={{ $('Application Form').first().json.Name }}",
+            "email": "={{ $('Application Form').first().json.Email }}",
+            "job_title": "={{ $('Application Form').first().json.Position }}",
+            "status": "Received",
+            "last_update": "={{ $now.toFormat('yyyy-MM-dd HH:mm') }}"
+          },
+          "matchingColumns": [
+            "application_id"
+          ],
+          "schema": [
+            {
+              "id": "application_id",
+              "displayName": "application_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "date",
+              "displayName": "date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "job_title",
+              "displayName": "job_title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "score",
+              "displayName": "score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "reason",
+              "displayName": "reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "interview_time",
+              "displayName": "interview_time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "last_update",
+              "displayName": "last_update",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "e16c8c1a-64db-4601-87c2-271cd5222480",
+      "name": "Log: Received",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        -1184,
+        880
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "6wTc27nuIfOqCIRh",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1XD25tfiQtIm8Y3NqG6hQcFT5kBrjS3L_Jc3sr1qxUug",
+          "mode": "list",
+          "cachedResultName": "jobs-sheet-template",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1XD25tfiQtIm8Y3NqG6hQcFT5kBrjS3L_Jc3sr1qxUug/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Candidates",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "application_id": "={{ $execution.id }}",
+            "status": "Pending HR - Reminder Sent",
+            "last_update": "={{ $now.toFormat('yyyy-MM-dd HH:mm') }}"
+          },
+          "matchingColumns": [
+            "application_id"
+          ],
+          "schema": [
+            {
+              "id": "application_id",
+              "displayName": "application_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "date",
+              "displayName": "date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "job_title",
+              "displayName": "job_title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "score",
+              "displayName": "score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "reason",
+              "displayName": "reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "interview_time",
+              "displayName": "interview_time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "last_update",
+              "displayName": "last_update",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "ca7559ad-a96d-4fc0-9e2d-37d379f18d10",
+      "name": "Log: HR Timeout",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        656,
+        1008
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "6wTc27nuIfOqCIRh",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1XD25tfiQtIm8Y3NqG6hQcFT5kBrjS3L_Jc3sr1qxUug",
+          "mode": "list",
+          "cachedResultName": "jobs-sheet-template",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1XD25tfiQtIm8Y3NqG6hQcFT5kBrjS3L_Jc3sr1qxUug/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Candidates",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "application_id": "={{ $execution.id }}",
+            "status": "Stalled - No HR Decision",
+            "last_update": "={{ $now.toFormat('yyyy-MM-dd HH:mm') }}"
+          },
+          "matchingColumns": [
+            "application_id"
+          ],
+          "schema": [
+            {
+              "id": "application_id",
+              "displayName": "application_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "date",
+              "displayName": "date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "job_title",
+              "displayName": "job_title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "score",
+              "displayName": "score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "reason",
+              "displayName": "reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "interview_time",
+              "displayName": "interview_time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "last_update",
+              "displayName": "last_update",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "1c884ae9-1812-4325-b288-6cac7396af77",
+      "name": "Log: No HR Response",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1328,
+        1136
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "6wTc27nuIfOqCIRh",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1XD25tfiQtIm8Y3NqG6hQcFT5kBrjS3L_Jc3sr1qxUug",
+          "mode": "list",
+          "cachedResultName": "jobs-sheet-template",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1XD25tfiQtIm8Y3NqG6hQcFT5kBrjS3L_Jc3sr1qxUug/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Candidates",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "application_id": "={{ $execution.id }}",
+            "status": "Approved",
+            "last_update": "={{ $now.toFormat('yyyy-MM-dd HH:mm') }}"
+          },
+          "matchingColumns": [
+            "application_id"
+          ],
+          "schema": [
+            {
+              "id": "application_id",
+              "displayName": "application_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "date",
+              "displayName": "date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "job_title",
+              "displayName": "job_title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "score",
+              "displayName": "score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "reason",
+              "displayName": "reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "interview_time",
+              "displayName": "interview_time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "last_update",
+              "displayName": "last_update",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "5e54d1c0-663d-4915-9b57-0490e2039e20",
+      "name": "Log: Approved",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        880,
+        640
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "6wTc27nuIfOqCIRh",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1XD25tfiQtIm8Y3NqG6hQcFT5kBrjS3L_Jc3sr1qxUug",
+          "mode": "list",
+          "cachedResultName": "jobs-sheet-template",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1XD25tfiQtIm8Y3NqG6hQcFT5kBrjS3L_Jc3sr1qxUug/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Candidates",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "application_id": "={{ $execution.id }}",
+            "status": "Rejected-HR",
+            "last_update": "={{ $now.toFormat('yyyy-MM-dd HH:mm') }}"
+          },
+          "matchingColumns": [
+            "application_id"
+          ],
+          "schema": [
+            {
+              "id": "application_id",
+              "displayName": "application_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "date",
+              "displayName": "date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "job_title",
+              "displayName": "job_title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "score",
+              "displayName": "score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "reason",
+              "displayName": "reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "interview_time",
+              "displayName": "interview_time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "last_update",
+              "displayName": "last_update",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "5029131a-8828-4344-9f92-66d903a95887",
+      "name": "Log: Rejected-HR",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        880,
+        1296
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "6wTc27nuIfOqCIRh",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1XD25tfiQtIm8Y3NqG6hQcFT5kBrjS3L_Jc3sr1qxUug",
+          "mode": "list",
+          "cachedResultName": "jobs-sheet-template",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1XD25tfiQtIm8Y3NqG6hQcFT5kBrjS3L_Jc3sr1qxUug/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Candidates",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "application_id": "={{ $execution.id }}",
+            "status": "Interview Scheduled",
+            "interview_time": "={{ $('Pick Interview Slot').first().json.pretty }}",
+            "last_update": "={{ $now.toFormat('yyyy-MM-dd HH:mm') }}"
+          },
+          "matchingColumns": [
+            "application_id"
+          ],
+          "schema": [
+            {
+              "id": "application_id",
+              "displayName": "application_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "date",
+              "displayName": "date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "job_title",
+              "displayName": "job_title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "score",
+              "displayName": "score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "reason",
+              "displayName": "reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "interview_time",
+              "displayName": "interview_time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "last_update",
+              "displayName": "last_update",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "4715cad7-5370-4758-afaa-0a28a0d7be40",
+      "name": "Log: Interview Scheduled",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        2000,
+        640
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "6wTc27nuIfOqCIRh",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "sendTo": "={{ ($('Get Jobs').first().json.escalation_email || $('Get Jobs').first().json.hr_email) }}",
+        "subject": "=⏰ REMINDER - no decision yet: {{ $('Application Form').first().json.Name }} ({{ $('Get Jobs').first().json.job_title }}) - Score {{ $('AI Analysis').first().json.output.score }}",
+        "message": "=⏰ REMINDER: this candidate has been waiting for an HR decision for 2 days.\nThe original request was sent to {{ $('Get Jobs').first().json.hr_email }}.\nIf there is still no decision within 2 days, the application will be put on hold and both of you will be alerted.\n\nCandidate: {{ $('Application Form').first().json.Name }}\nEmail: {{ $('Application Form').first().json.Email }}\nPosition: {{ $('Get Jobs').first().json.job_title }}\nScore: {{ $('AI Analysis').first().json.output.score }}/100 (pass score: {{ (Number($('Get Jobs').first().json.pass_score) || 70) }})\nReason: {{ $('AI Analysis').first().json.output.reason }}\n\nExperience: {{ $('AI Analysis').first().json.output.years_of_experience }} years\nEducation: {{ $('AI Analysis').first().json.output.education }}\nSkills: {{ $('AI Analysis').first().json.output.skills.join(', ') }}\nMatched: {{ $('AI Analysis').first().json.output.matched_skills.join(', ') }}\nMissing: {{ $('AI Analysis').first().json.output.missing_skills.join(', ') }}\n\nSummary:\n{{ $('AI Analysis').first().json.output.summary }}",
+        "approvalOptions": {
+          "values": {
+            "approvalType": "double",
+            "approveLabel": "✅ Approve - Schedule Interview",
+            "disapproveLabel": "❌ Reject"
+          }
+        },
+        "options": {
+          "limitWaitTime": {
+            "values": {
+              "resumeAmount": 2,
+              "resumeUnit": "minutes"
+            }
+          }
+        }
+      },
+      "id": "64e1014b-a7ec-446f-85ce-c4d050e8757c",
+      "name": "Escalate to HR (Reminder)",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        880,
+        1008
+      ],
+      "webhookId": "5669f4f3-4ef2-428b-9d56-0152382775e2",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "cDz9RhFVhep9TXg8",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ [$('Get Jobs').first().json.hr_email, ($('Get Jobs').first().json.escalation_email || $('Get Jobs').first().json.hr_email)].filter((v, i, a) => v && a.indexOf(v) === i).join(',') }}",
+        "subject": "=🚨 No decision after 4 days: {{ $('Application Form').first().json.Name }} ({{ $('Get Jobs').first().json.job_title }})",
+        "emailType": "text",
+        "message": "=No HR decision was received for the candidate below, even after the reminder. The application is ON HOLD (the candidate has NOT been rejected or notified).\n\nCandidate: {{ $('Application Form').first().json.Name }}\nEmail: {{ $('Application Form').first().json.Email }}\nPosition: {{ $('Get Jobs').first().json.job_title }}\nScore: {{ $('AI Analysis').first().json.output.score }}/100\nReason: {{ $('AI Analysis').first().json.output.reason }}\n\nPlease review this candidate manually (see the Candidates sheet, status: Stalled - No HR Decision).",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "78634896-e57f-4d79-b87d-b3b0b5b9e663",
+      "name": "Alert HR: No Decision",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1552,
+        1136
+      ],
+      "webhookId": "5f60e245-7de7-4909-91dd-b579d714c0d1",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "cDz9RhFVhep9TXg8",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "calendar",
+        "calendar": {
+          "__rl": true,
+          "value": "={{ $('Get Jobs').first().json.hr_email }}",
+          "mode": "id"
+        },
+        "timeMin": "={{ $now.plus({ days: 1 }).startOf('day').toISO() }}",
+        "timeMax": "={{ $now.plus({ days: 15 }).endOf('day').toISO() }}",
+        "options": {
+          "outputFormat": "raw"
+        }
+      },
+      "id": "d9962808-695b-43d4-b318-921dfacb9bdd",
+      "name": "Check HR Calendar",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        1104,
+        640
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "gUAIbNYVOsPCotAA",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"years_of_experience\": {\n      \"type\": \"number\",\n      \"description\": \"Total years of relevant professional experience\"\n    },\n    \"skills\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"string\"\n      },\n      \"description\": \"All skills found in the CV\"\n    },\n    \"education\": {\n      \"type\": \"string\",\n      \"description\": \"Highest education found in the CV\"\n    },\n    \"summary\": {\n      \"type\": \"string\",\n      \"description\": \"2-3 lines summary in English\"\n    },\n    \"matched_skills\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"string\"\n      },\n      \"description\": \"Required skills found in the CV\"\n    },\n    \"missing_skills\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"string\"\n      },\n      \"description\": \"Required skills NOT found in the CV\"\n    },\n    \"score\": {\n      \"type\": \"number\",\n      \"minimum\": 0,\n      \"maximum\": 100,\n      \"description\": \"Overall score from 0 to 100\"\n    },\n    \"reason\": {\n      \"type\": \"string\",\n      \"description\": \"Why this score, in one sentence\"\n    }\n  },\n  \"required\": [\n    \"years_of_experience\",\n    \"skills\",\n    \"education\",\n    \"summary\",\n    \"matched_skills\",\n    \"missing_skills\",\n    \"score\",\n    \"reason\"\n  ]\n}"
+      },
+      "id": "f19f6cab-0693-451f-8674-3ad3df544ec7",
+      "name": "Structured Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        -624,
+        1104
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1XD25tfiQtIm8Y3NqG6hQcFT5kBrjS3L_Jc3sr1qxUug",
+          "mode": "list",
+          "cachedResultName": "jobs-sheet-template",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1XD25tfiQtIm8Y3NqG6hQcFT5kBrjS3L_Jc3sr1qxUug/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Candidates",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "application_id": "={{ $execution.id }}",
+            "score": "={{ $('AI Analysis').first().json.output.score }}",
+            "reason": "={{ $('AI Analysis').first().json.output.reason }}",
+            "status": "={{ $('AI Analysis').first().json.output.score >= (Number($('Get Jobs').first().json.pass_score) || 70) ? 'Pending HR' : 'Rejected-AI' }}",
+            "last_update": "={{ $now.toFormat('yyyy-MM-dd HH:mm') }}"
+          },
+          "matchingColumns": [
+            "application_id"
+          ],
+          "schema": [
+            {
+              "id": "application_id",
+              "displayName": "application_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "date",
+              "displayName": "date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "job_title",
+              "displayName": "job_title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "score",
+              "displayName": "score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "reason",
+              "displayName": "reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "interview_time",
+              "displayName": "interview_time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "last_update",
+              "displayName": "last_update",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "69f99a6b-89a7-4659-931e-edb6d8950a9c",
+      "name": "Log: Scored",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        -464,
+        880
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "6wTc27nuIfOqCIRh",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "c8b5c76f-bf39-4f97-bafa-884920bb07f5",
+                    "leftValue": "={{ $json.data?.approved === true }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Approved"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "db6325ea-34ed-4c8d-934f-afec27699d8b",
+                    "leftValue": "={{ $json.data?.approved === false }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Rejected"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "38466c9c-f241-44ec-966d-7fdd6d9a4ccf",
+                    "leftValue": "={{ typeof $json.data?.approved !== 'boolean' }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "No response"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f4d7abcb-2ad0-48c9-b919-29deb3a925e5",
+      "name": "HR Decision?",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        432,
+        768
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "0b83ffc7-a548-486e-a246-4e3d7c6052c5",
+                    "leftValue": "={{ $json.data?.approved === true }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Approved"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "264cfe5c-6886-4044-be65-0cb56fba95d4",
+                    "leftValue": "={{ $json.data?.approved === false }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Rejected"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "6dcb4f68-5c56-4a00-9754-16e947f1d5f3",
+                    "leftValue": "={{ typeof $json.data?.approved !== 'boolean' }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "No response"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "db969048-1689-4dd8-9f54-150305d6aef4",
+      "name": "Escalation Decision?",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1104,
+        1008
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Application Form": {
+      "main": [
+        [
+          {
+            "node": "Extract CV Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Jobs": {
+      "main": [
+        [
+          {
+            "node": "AI Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract CV Text": {
+      "main": [
+        [
+          {
+            "node": "Log: Received",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Analysis",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Analysis": {
+      "main": [
+        [
+          {
+            "node": "Log: Scored",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Score >= Job Pass Score?": {
+      "main": [
+        [
+          {
+            "node": "Ask HR for Decision",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Rejection Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask HR for Decision": {
+      "main": [
+        [
+          {
+            "node": "HR Decision?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick Interview Slot": {
+      "main": [
+        [
+          {
+            "node": "Create Interview Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Interview Event": {
+      "main": [
+        [
+          {
+            "node": "Send Acceptance Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log: Received": {
+      "main": [
+        [
+          {
+            "node": "Get Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log: HR Timeout": {
+      "main": [
+        [
+          {
+            "node": "Escalate to HR (Reminder)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Escalate to HR (Reminder)": {
+      "main": [
+        [
+          {
+            "node": "Escalation Decision?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log: No HR Response": {
+      "main": [
+        [
+          {
+            "node": "Alert HR: No Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log: Rejected-HR": {
+      "main": [
+        [
+          {
+            "node": "Send Rejection Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log: Approved": {
+      "main": [
+        [
+          {
+            "node": "Check HR Calendar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check HR Calendar": {
+      "main": [
+        [
+          {
+            "node": "Pick Interview Slot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Acceptance Email": {
+      "main": [
+        [
+          {
+            "node": "Log: Interview Scheduled",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Analysis",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log: Scored": {
+      "main": [
+        [
+          {
+            "node": "Score >= Job Pass Score?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HR Decision?": {
+      "main": [
+        [
+          {
+            "node": "Log: Approved",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log: Rejected-HR",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log: HR Timeout",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Escalation Decision?": {
+      "main": [
+        [
+          {
+            "node": "Log: Approved",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log: Rejected-HR",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log: No HR Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "9c261337-42ae-467d-9776-ec870439763f",
+  "meta": {
+    "instanceId": "ee14c41a3da447719e53182c13e3b88772f4ac2773c083001915f2a03b254eb0"
+  },
+  "nodeGroups": [],
+  "id": "8ehSy57IXNN9owiP",
+  "tags": []
+}
